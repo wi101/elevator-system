@@ -1,11 +1,14 @@
 package com.elevator
 
 import org.specs2.Specification
+import org.specs2.concurrent.ExecutionEnv
+import org.specs2.specification.AroundTimeout
+
 
 import scala.concurrent.duration._
 import scalaz.zio.{IO, RTS, Schedule}
 
-class ElevatorSystemSpec extends Specification with RTS {
+class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with RTS with AroundTimeout {
   def is = "ElevatorSystemSpec".title ^ s2"""
 
      make an Elevator System and check if:
@@ -15,9 +18,9 @@ class ElevatorSystemSpec extends Specification with RTS {
 
     `query` query the state of the elevator                                                     $e4
     `request` add a pick-up request in Elevator state                                           $e5
-    `run` must run all requests and move the elevators to their next stops                      $e6
-    `run` must run all pick-up requests                                                         $e7
-    `run` must run all pick-up requests even if the requests are more than the elevator number  $e8
+    `run` must run all requests and move the elevators to their next stops                      ${upTo(30.seconds)(e6)}
+    `run` must run all pick-up requests                                                         ${upTo(30.seconds)(e7)}
+    `run` must run all pick-up requests even if the requests are more than the elevator number  ${upTo(30.seconds)(e8)}
 
     """
 
@@ -115,7 +118,7 @@ class ElevatorSystemSpec extends Specification with RTS {
     unsafeRun(
       (for {
         system <- ElevatorSystem(elevators)
-        _ <- system.run(1.millis).fork
+        _ <- system.run(1.second).fork
         _ <- system.request(request)
         _ <- system.requestCount
           .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
@@ -134,7 +137,7 @@ class ElevatorSystemSpec extends Specification with RTS {
       (for {
         system <- ElevatorSystem(elevators)
         _ <- IO.forkAll(requests.map(system.request))
-        _ <- system.run(1.millis).fork
+        _ <- system.run(1.second).fork
         size <- system.query
           .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))) *> system.requestCount
           .repeat(Schedule.doUntil(_ <= 0))
