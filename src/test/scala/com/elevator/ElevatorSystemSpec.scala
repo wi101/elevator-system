@@ -1,16 +1,11 @@
 package com.elevator
 
-import java.util.concurrent.TimeUnit
-
-import org.specs2.Specification
 import org.specs2.concurrent.ExecutionEnv
-import org.specs2.specification.AroundTimeout
 import scalaz.zio.clock.sleep
-import scalaz.zio.{DefaultRuntime, IO, Schedule}
+import scalaz.zio.duration._
+import scalaz.zio.{IO, Schedule}
 
-import scala.concurrent.duration._
-
-class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with DefaultRuntime with AroundTimeout {
+class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
   def is = "ElevatorSystemSpec".title ^ s2"""
 
      make an Elevator System and check if:
@@ -20,9 +15,9 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with D
 
     `query` query the state of the elevator                                                     $e4
     `request` add a pick-up request in Elevator state                                           $e5
-    `run` must run all requests and move the elevators to their next stops                      ${upTo(30.seconds)(e6)}
-    `run` must run all pick-up requests                                                         ${upTo(30.seconds)(e7)}
-    `run` must run all pick-up requests even if the requests are more than the elevator number  ${upTo(30.seconds)(e8)}
+    `run` must run all requests and move the elevators to their next stops                      $e6
+    `run` must run all pick-up requests                                                         $e7
+    `run` must run all pick-up requests even if the requests are more than the elevator number  $e8
 
     """
 
@@ -69,12 +64,10 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with D
                            ElevatorState(2, Set(0)),
                            ElevatorState(7, Set(4)),
                            ElevatorState(2, Set(3, 4)))
-    unsafeRun(
       for {
         system <- ElevatorSystem(elevators)
         r <- system.query
       } yield r must_=== elevators
-    )
   }
   def e5 = {
     val elevators = Vector(ElevatorState(1, Set.empty),
@@ -82,14 +75,12 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with D
                            ElevatorState(7, Set(4)),
                            ElevatorState(2, Set(3, 4)))
     val request = PickupRequest(2, 1)
-    unsafeRun(
       for {
         system <- ElevatorSystem(elevators)
         sizeBefore <- system.requestCount
         _ <- system.request(request)
         sizeAfter <- system.requestCount
       } yield (sizeBefore must_=== 0) and (sizeAfter must_=== 1)
-    )
   }
 
   def e6 = {
@@ -99,17 +90,15 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with D
     val request = PickupRequest(1, 0)
     val finalState =
       Vector(ElevatorState(0, Set.empty), ElevatorState(15, Set.empty))
-    unsafeRun(
       (for {
         system <- ElevatorSystem(elevators)
         _ <- system.request(request).fork
-        _ <- system.run(millis(1)).fork *> sleep(millis(300))
+        _ <- system.run(1.millis).fork *> sleep(300.millis)
         _ <- system.requestCount
           .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
         state <- system.query.repeat(Schedule.doUntil(
           _.forall(_.stops.isEmpty))) //the elevators will be all free (without stops)
       } yield state must_=== finalState).supervised
-    )
   }
 
   def e7 = {
@@ -118,17 +107,15 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with D
     val request = PickupRequest(7, 15)
     val finalState =
       Vector(ElevatorState(1, Set.empty), ElevatorState(15, Set.empty))
-    unsafeRun(
       (for {
         system <- ElevatorSystem(elevators)
-        _ <- system.run(seconds(1)).fork
+        _ <- system.run(1.second).fork
         _ <- system.request(request)
         _ <- system.requestCount
           .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
         state <- system.query.repeat(Schedule.doUntil(
           _.forall(_.stops.isEmpty))) //the elevators will be all free
       } yield state must_=== finalState).supervised
-    )
   }
 
   def e8 = {
@@ -136,19 +123,14 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with D
       Vector(ElevatorState(1, Set.empty), ElevatorState(6, Set(10, 13, 14)))
     val requests =
       List(PickupRequest(7, 15), PickupRequest(2, 3), PickupRequest(15, 0))
-    unsafeRun(
       (for {
         system <- ElevatorSystem(elevators)
         _ <- IO.forkAll(requests.map(system.request))
-        _ <- system.run(seconds(1)).fork
+        _ <- system.run(1.second).fork
         size <- system.query
           .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))) *> system.requestCount
           .repeat(Schedule.doUntil(_ <= 0))
       } yield size must be_<=(0)).supervised
-    )
   }
-
-  private def millis(t: Int) = scalaz.zio.duration.Duration.apply(t, TimeUnit.MILLISECONDS)
-  private def seconds(t: Int) = scalaz.zio.duration.Duration.apply(t, TimeUnit.SECONDS)
 
 }
