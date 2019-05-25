@@ -1,8 +1,8 @@
 package com.elevator
 
+import scalaz.zio.duration._
 import scalaz.zio._
 import scalaz.zio.clock.Clock
-import scalaz.zio.duration.Duration
 
 final case class ElevatorState(floor: Int, stops: Set[Int]) { current =>
   def step: Option[ElevatorState] = {
@@ -51,7 +51,7 @@ final class ElevatorSystem(elevators: Ref[Vector[ElevatorState]],
     * 3. add the next stops to the selected elevator and update the elevator state
     * 4. consume (listen) every incoming request
     */
-  def run(duration: Duration): ZIO[Any with Clock, Nothing, Unit] = {
+  def run(duration: Duration): ZIO[Clock, Nothing, Unit] = {
     val moveElevator = elevators
       .update(ElevatorSystem.step)
       .repeat(Schedule.spaced(duration))
@@ -79,7 +79,7 @@ final class ElevatorSystem(elevators: Ref[Vector[ElevatorState]],
     * the pickupRequest contains the floor and the direction
     * adds a new request asynchronously (we need to run it concurrently by calling system.request.fork
     */
-  def request(pickupRequest: PickupRequest): ZIO[Any, Nothing, Boolean] =
+  def request(pickupRequest: PickupRequest): UIO[Boolean] =
     requests.offer(pickupRequest)
 
   /**
