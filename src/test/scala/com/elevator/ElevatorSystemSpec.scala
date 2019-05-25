@@ -1,14 +1,16 @@
 package com.elevator
 
+import java.util.concurrent.TimeUnit
+
 import org.specs2.Specification
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.specification.AroundTimeout
-
+import scalaz.zio.clock.sleep
+import scalaz.zio.{DefaultRuntime, IO, Schedule}
 
 import scala.concurrent.duration._
-import scalaz.zio.{IO, RTS, Schedule}
 
-class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with RTS with AroundTimeout {
+class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with DefaultRuntime with AroundTimeout {
   def is = "ElevatorSystemSpec".title ^ s2"""
 
      make an Elevator System and check if:
@@ -91,6 +93,7 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with R
   }
 
   def e6 = {
+
     val elevators =
       Vector(ElevatorState(1, Set.empty), ElevatorState(2, Set(10, 13, 15)))
     val request = PickupRequest(1, 0)
@@ -100,7 +103,7 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with R
       (for {
         system <- ElevatorSystem(elevators)
         _ <- system.request(request).fork
-        _ <- system.run(1.millis).fork *> IO.sleep(300.millis)
+        _ <- system.run(millis(1)).fork *> sleep(millis(300))
         _ <- system.requestCount
           .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
         state <- system.query.repeat(Schedule.doUntil(
@@ -118,7 +121,7 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with R
     unsafeRun(
       (for {
         system <- ElevatorSystem(elevators)
-        _ <- system.run(1.second).fork
+        _ <- system.run(seconds(1)).fork
         _ <- system.request(request)
         _ <- system.requestCount
           .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
@@ -137,12 +140,15 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends Specification with R
       (for {
         system <- ElevatorSystem(elevators)
         _ <- IO.forkAll(requests.map(system.request))
-        _ <- system.run(1.second).fork
+        _ <- system.run(seconds(1)).fork
         size <- system.query
           .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))) *> system.requestCount
           .repeat(Schedule.doUntil(_ <= 0))
       } yield size must be_<=(0)).supervised
     )
   }
+
+  private def millis(t: Int) = scalaz.zio.duration.Duration.apply(t, TimeUnit.MILLISECONDS)
+  private def seconds(t: Int) = scalaz.zio.duration.Duration.apply(t, TimeUnit.SECONDS)
 
 }

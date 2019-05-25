@@ -1,3 +1,5 @@
 .sbtopts
 target/
 project/project
+.tags
+.idea/
