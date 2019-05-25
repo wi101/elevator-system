@@ -5,7 +5,7 @@ import scalaz.zio.clock.sleep
 import scalaz.zio.duration._
 import scalaz.zio.{IO, Schedule}
 
-class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRutime {
+class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
   def is = "ElevatorSystemSpec".title ^ s2"""
 
      make an Elevator System and check if:

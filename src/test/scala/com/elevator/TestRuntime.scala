@@ -1,13 +1,15 @@
 package com.elevator
+
 import java.util.{Timer, TimerTask}
 import org.specs2.Specification
 import org.specs2.execute.AsResult
 import org.specs2.specification.core.{AsExecution, Execution}
-import scala.concurrent.{ExecutionContext, Future}
+
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scalaz.zio.{DefaultRuntime, FiberFailure, ZIO}
 
-abstract class TestRutime extends Specification with DefaultRuntime {
+abstract class TestRuntime extends Specification with DefaultRuntime {
   val DefaultTimeout: Duration = 60.seconds
   val timer = new Timer()
   implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
