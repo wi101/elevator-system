@@ -3,7 +3,7 @@ package com.elevator.v2
 import scalaz.zio._
 import scalaz.zio.clock.Clock
 import scalaz.zio.duration._
-import scalaz.zio.stm.{STM, TRef}
+import scalaz.zio.stm.{STM, TQueue, TRef}
 
 final case class ElevatorState(floor: Int, stops: Set[Int]) { current =>
   def step: ElevatorState = {
@@ -38,7 +38,7 @@ final case class ElevatorState(floor: Int, stops: Set[Int]) { current =>
 final case class PickupRequest(floor: Int, destinationFloor: Int)
 
 final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
-                           requestsTRef: TRef[Vector[PickupRequest]]) {
+                           requestQueue: TQueue[PickupRequest]) {
 
   /**
     * Querying the state of the elevator
@@ -60,26 +60,17 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
     */
   private val processRequests: ZIO[Clock, Nothing, Unit] =
     STM.atomically(for {
-        requests <- requestsTRef.get
-        _ <- STM.check(requests.nonEmpty)
-        elevatorStates <- elevators.get
-        changeStates = requests.flatMap { request =>
-          val maybeStateIndex = ElevatorSystem.search(elevatorStates, request)
-          maybeStateIndex match {
-            case None => None
+        request <- requestQueue.take
+        _ <- elevators.update { state =>
+          ElevatorSystem.search(state, request) match {
+            case None => state
             case Some(index) =>
-              Some((request, index, Set(request.floor, request.destinationFloor)))
+              state.updated(index,
+                state(index)
+                  .addStops(Set(request.floor, request.destinationFloor)))
           }
         }
-        _ <- changeStates.foldLeft(elevators.get) {
-          case (_, (request, index, newStops)) =>
-            elevators.update(
-              elevator =>
-                elevator.updated(index,
-                  elevator(index).addStops(newStops))) <* requestsTRef.update(_.filterNot(_ == request))
-        }
-
-      } yield ())
+    } yield ())
       .repeat(Schedule.forever)
       .unit
 
@@ -98,17 +89,15 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
     * the pickupRequest contains the floor and the direction
     * adds a new request asynchronously (we need to run it concurrently by calling system.request.fork
     */
-  def request(pickupRequest: PickupRequest): UIO[Unit] = {
-    requestsTRef
-      .update(_ :+ pickupRequest)
+  def request(pickupRequest: PickupRequest): UIO[Unit] =
+    requestQueue
+      .offer(pickupRequest)
       .commit
-      .unit
-  }
 
   /**
     * Gets requests count
     */
-  def requestCount: UIO[Int] = requestsTRef.get.commit.map(_.size)
+  def requestCount: UIO[Int] = requestQueue.size.commit
 }
 
 object ElevatorSystem {
@@ -127,7 +116,7 @@ object ElevatorSystem {
     */
   def apply(elevators: Vector[ElevatorState]): UIO[ElevatorSystem] = {
     (for {
-      requests <- TRef.make(Vector.empty[PickupRequest])
+      requests <- TQueue.make[PickupRequest](elevators.size)
       state <- TRef.make(elevators)
     } yield new ElevatorSystem(state, requests)).commit
   }
