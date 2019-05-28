@@ -2,7 +2,6 @@ package com.elevator.v2
 
 import com.elevator.TestRuntime
 import org.specs2.concurrent.ExecutionEnv
-import scalaz.zio.clock.sleep
 import scalaz.zio.duration._
 import scalaz.zio.{IO, Schedule}
 
@@ -94,7 +93,7 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     (for {
       system <- ElevatorSystem(elevators)
       _ <- system.request(request).fork
-      _ <- system.run(100.millis).fork *> sleep(300.millis)
+      _ <- system.run(1.millis).fork
       _ <- system.requestCount
         .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
       state <- system.query.repeat(Schedule.doUntil(
@@ -110,7 +109,7 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
       Vector(ElevatorState(1, Set.empty), ElevatorState(15, Set.empty))
     (for {
       system <- ElevatorSystem(elevators)
-      _ <- system.run(100.millis).fork
+      _ <- system.run(1.millis).fork
       _ <- system.request(request)
       _ <- system.requestCount
         .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
@@ -127,7 +126,7 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     (for {
       system <- ElevatorSystem(elevators)
       _ <- IO.forkAll(requests.map(system.request))
-      _ <- system.run(100.millis).fork
+      _ <- system.run(1.millis).fork
       size <- system.query
         .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))) *> system.requestCount
         .repeat(Schedule.doUntil(_ <= 0))
