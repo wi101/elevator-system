@@ -1,39 +1,10 @@
-package com.elevator.v2
+package com.elevator
+package v2
 
 import scalaz.zio._
 import scalaz.zio.clock.Clock
 import scalaz.zio.duration._
 import scalaz.zio.stm.{STM, TQueue, TRef}
-
-final case class ElevatorState(floor: Int, stops: Set[Int]) { current =>
-  def step: ElevatorState = {
-    if (isStationary)
-      current
-    else if (isGoingUp)
-      ElevatorState(floor = floor + 1, stops = stops - (floor + 1))
-    else
-      ElevatorState(floor = floor - 1, stops = stops - (floor - 1))
-  }
-
-  def isFree: Boolean = stops.isEmpty
-  def isGoingUp: Boolean = stops.forall(floor <= _)
-  def isGoingDown: Boolean = stops.forall(floor >= _)
-  def isStationary: Boolean = isGoingUp && isGoingDown
-
-  /**
-    * Checks if the requested floor is on way of the elevator and if it is on the same destination
-    */
-  def isOnWay(from: Int, to: Int): Boolean =
-    (from >= floor && to >= floor && isGoingUp) || (from <= floor && to <= floor && isGoingDown) || isFree
-
-  def distanceFrom(f: Int): Int = (floor - f).abs
-
-  /**
-    * adds a next stop if the current elevator is in other floor otherwise keep the same stops
-    */
-  def addStops(newStops: Set[Int]): ElevatorState =
-    copy(stops = stops ++ newStops.filterNot(_ == floor))
-}
 
 final case class PickupRequest(floor: Int, destinationFloor: Int)
 
@@ -59,18 +30,20 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
     * Handle the requests and add stops to the adequate elevator
     */
   private val processRequests: ZIO[Clock, Nothing, Unit] =
-    STM.atomically(for {
+    STM
+      .atomically(for {
         request <- requestQueue.take
         _ <- elevators.update { state =>
           ElevatorSystem.search(state, request) match {
             case None => state
             case Some(index) =>
-              state.updated(index,
+              state.updated(
+                index,
                 state(index)
-                  .addStops(Set(request.floor, request.destinationFloor)))
+                  .addStops(request.floor, request.destinationFloor))
           }
         }
-    } yield ())
+      } yield ())
       .repeat(Schedule.forever)
       .unit
 
@@ -102,7 +75,7 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
 
 object ElevatorSystem {
 
-  val initialElevatorState: ElevatorState = ElevatorState(0, Set.empty)
+  val initialElevatorState: ElevatorState = ElevatorState(0, Vector.empty)
 
   /**
     * initialize all elevators with an initial state
@@ -126,11 +99,11 @@ object ElevatorSystem {
     */
   private[elevator] final def search(elevators: Vector[ElevatorState],
                                      request: PickupRequest): Option[Int] =
-      elevators.zipWithIndex
-        .filter(_._1.isOnWay(request.floor, request.destinationFloor))
-        .sortBy(_._1.distanceFrom(request.floor))
-        .headOption
-        .map(_._2)
+    elevators.zipWithIndex
+      .filter(_._1.isOnWay(request.floor, request.destinationFloor))
+      .sortBy(_._1.distanceFrom(request.floor))
+      .headOption
+      .map(_._2)
 
   /**
     * Moves elevators Up or Down depending on their stops
