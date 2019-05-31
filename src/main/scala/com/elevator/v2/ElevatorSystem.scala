@@ -102,8 +102,7 @@ object ElevatorSystem {
     elevators.zipWithIndex
       .filter(_._1.isOnWay(request.floor, request.destinationFloor))
       .sortBy(_._1.distanceFrom(request.floor))
-      .headOption
-      .map(_._2)
+      .collectFirst { case (_, index) => index }
 
   /**
     * Moves elevators Up or Down depending on their stops

@@ -4,8 +4,6 @@ import scalaz.zio.duration._
 import scalaz.zio._
 import scalaz.zio.clock.Clock
 
-
-
 final case class PickupRequest(floor: Int, destinationFloor: Int)
 
 final class ElevatorSystem(elevators: Ref[Vector[ElevatorState]],
@@ -89,8 +87,7 @@ object ElevatorSystem {
     elevators.zipWithIndex
       .filter(_._1.isOnWay(request.floor, request.destinationFloor))
       .sortBy(_._1.distanceFrom(request.floor))
-      .headOption
-      .map(_._2)
+      .collectFirst { case (_, index) => index }
 
   /**
     * Moves elevators Up or Down depending on their stops
