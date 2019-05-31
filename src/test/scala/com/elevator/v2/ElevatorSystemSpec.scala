@@ -1,4 +1,5 @@
 package com.elevator
+package v2
 
 import org.specs2.concurrent.ExecutionEnv
 import scalaz.zio.duration._
@@ -22,9 +23,9 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
 
   def e1 = {
     val elevators = Vector(ElevatorState(1, Vector.empty),
-                           ElevatorState(4, Vector(0)),
-                           ElevatorState(7, Vector(4)),
-                           ElevatorState(2, Vector(3, 4)))
+      ElevatorState(4, Vector(0)),
+      ElevatorState(7, Vector(4)),
+      ElevatorState(2, Vector(3, 4)))
     val request1 = PickupRequest(2, 0)
     val request2 = PickupRequest(6, 2)
     val request3 = PickupRequest(3, 2)
@@ -40,11 +41,11 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
 
   def e2 = {
     val elevators = Vector(ElevatorState(2, Vector(0)),
-                           ElevatorState(7, Vector(6)),
-                           ElevatorState(2, Vector(3, 4)))
+      ElevatorState(7, Vector(6)),
+      ElevatorState(2, Vector(3, 4)))
     val expectedResult = Vector(ElevatorState(1, Vector(0)),
-                                ElevatorState(6, Vector.empty),
-                                ElevatorState(3, Vector(4)))
+      ElevatorState(6, Vector.empty),
+      ElevatorState(3, Vector(4)))
 
     ElevatorSystem.step(elevators) must_=== expectedResult
   }
@@ -60,25 +61,25 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
 
   def e4 = {
     val elevators = Vector(ElevatorState(1, Vector.empty),
-                           ElevatorState(2, Vector(0)),
-                           ElevatorState(7, Vector(4)),
-                           ElevatorState(2, Vector(3, 4)))
-      for {
-        system <- ElevatorSystem(elevators)
-        r <- system.query
-      } yield r must_=== elevators
+      ElevatorState(2, Vector(0)),
+      ElevatorState(7, Vector(4)),
+      ElevatorState(2, Vector(3, 4)))
+    for {
+      system <- ElevatorSystem(elevators)
+      r <- system.query
+    } yield r must_=== elevators
   }
   def e5 = {
     val elevators = Vector(ElevatorState(1, Vector.empty),
-                           ElevatorState(9, Vector(0)),
-                           ElevatorState(7, Vector(4)),
-                           ElevatorState(2, Vector(3, 4)))
-      for {
-        system <- ElevatorSystem(elevators)
-        sizeBefore <- system.requestCount
-        _ <- system.request(PickupRequest(8, 1))
-        sizeAfter <- system.requestCount
-      } yield (sizeBefore must_=== 0) and (sizeAfter must_=== 1)
+      ElevatorState(9, Vector(0)),
+      ElevatorState(7, Vector(4)),
+      ElevatorState(2, Vector(3, 4)))
+    for {
+      system <- ElevatorSystem(elevators)
+      sizeBefore <- system.requestCount
+      _ <- system.request(PickupRequest(8, 1))
+      sizeAfter <- system.requestCount
+    } yield (sizeBefore must_=== 0) and (sizeAfter must_=== 1)
   }
 
   def e6 = {
@@ -89,15 +90,15 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
 
     val finalState =
       Vector(ElevatorState(1, Vector.empty), ElevatorState(41, Vector.empty))
-      (for {
-        system <- ElevatorSystem(elevators)
-        _ <- system.request(request)
-        _ <- system.run(50.millis).fork
-        _ <- system.requestCount
-          .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
-        state <- system.query.repeat(Schedule.doUntil(
-          _.forall(_.stops.isEmpty))) //the elevators will be all free (without stops)
-      } yield state must_=== finalState).supervised
+    (for {
+      system <- ElevatorSystem(elevators)
+      _ <- system.request(request)
+      _ <- system.run(50.millis).fork
+      _ <- system.requestCount
+        .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
+      state <- system.query.repeat(Schedule.doUntil(
+        _.forall(_.stops.isEmpty))) //the elevators will be all free (without stops)
+    } yield state must_=== finalState).supervised
   }
 
   def e7 = {
@@ -106,15 +107,15 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     val request = PickupRequest(3, 2)
     val finalState =
       Vector(ElevatorState(2, Vector.empty), ElevatorState(14, Vector.empty))
-      (for {
-        system <- ElevatorSystem(elevators)
-        _ <- system.run(50.millis).fork
-        _ <- system.request(request)
-        _ <- system.requestCount
-          .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
-        state <- system.query.repeat(Schedule.doUntil(
-          _.forall(_.stops.isEmpty))) //the elevators will be all free
-      } yield state must_=== finalState).supervised
+    (for {
+      system <- ElevatorSystem(elevators)
+      _ <- system.run(50.millis).fork
+      _ <- system.request(request)
+      _ <- system.requestCount
+        .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
+      state <- system.query.repeat(Schedule.doUntil(
+        _.forall(_.stops.isEmpty))) //the elevators will be all free
+    } yield state must_=== finalState).supervised
   }
 
   def e8 = {
@@ -122,14 +123,13 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
       Vector(ElevatorState(1, Vector.empty), ElevatorState(6, Vector(10, 13, 14)))
     val requests =
       List(PickupRequest(7, 15), PickupRequest(2, 3), PickupRequest(15, 0))
-      (for {
-        system <- ElevatorSystem(elevators)
-        _ <- IO.forkAll(requests.map(system.request))
-        _ <- system.run(1.second).fork
-        size <- system.query
-          .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))) *> system.requestCount
-          .repeat(Schedule.doUntil(_ <= 0))
-      } yield size must be_<=(0)).supervised
+    (for {
+      system <- ElevatorSystem(elevators)
+      _ <- IO.forkAll(requests.map(system.request))
+      _ <- system.run(1.second).fork
+      size <- system.query
+        .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))) *> system.requestCount
+        .repeat(Schedule.doUntil(_ <= 0))
+    } yield size must be_<=(0)).supervised
   }
-
 }

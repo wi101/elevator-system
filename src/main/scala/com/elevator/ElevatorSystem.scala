@@ -4,35 +4,6 @@ import scalaz.zio.duration._
 import scalaz.zio._
 import scalaz.zio.clock.Clock
 
-final case class ElevatorState(floor: Int, stops: Set[Int]) { current =>
-  def step: Option[ElevatorState] = {
-    if (isStationary)
-      None
-    else if (isGoingUp)
-      Some(ElevatorState(floor = floor + 1, stops = stops - (floor + 1)))
-    else
-      Some(ElevatorState(floor = floor - 1, stops = stops - (floor - 1)))
-  }
-
-  def isFree: Boolean = stops.isEmpty
-  def isGoingUp: Boolean = stops.forall(floor <= _)
-  def isGoingDown: Boolean = stops.forall(floor >= _)
-  def isStationary: Boolean = isGoingUp && isGoingDown
-
-  /**
-    * Checks if the requested floor is on way of the elevator and if it is on the same destination
-    */
-  def isOnWay(from: Int, to: Int): Boolean =
-    (from >= floor && to >= floor && isGoingUp) || (from <= floor && to <= floor && isGoingDown) || isFree
-
-  def distanceFrom(f: Int): Int = (floor - f).abs
-
-  /**
-    * adds a next stop if the current elevator is in other floor otherwise keep the same stops
-    */
-  def addStop(stop: Int): ElevatorState =
-    if (stop != floor) copy(stops = stops + stop) else current
-}
 final case class PickupRequest(floor: Int, destinationFloor: Int)
 
 final class ElevatorSystem(elevators: Ref[Vector[ElevatorState]],
@@ -64,8 +35,7 @@ final class ElevatorSystem(elevators: Ref[Vector[ElevatorState]],
           case Some(index) =>
             state.updated(index,
                           state(index)
-                            .addStop(request.floor)
-                            .addStop(request.destinationFloor))
+                            .addStops(request.floor, request.destinationFloor))
         }
       }
     } yield ()).repeat(Schedule.forever).unit
@@ -90,7 +60,7 @@ final class ElevatorSystem(elevators: Ref[Vector[ElevatorState]],
 
 object ElevatorSystem {
 
-  val initialElevatorState: ElevatorState = ElevatorState(0, Set.empty)
+  val initialElevatorState: ElevatorState = ElevatorState(0, Vector.empty)
 
   /**
     * initialize all elevators with an initial state
@@ -117,13 +87,12 @@ object ElevatorSystem {
     elevators.zipWithIndex
       .filter(_._1.isOnWay(request.floor, request.destinationFloor))
       .sortBy(_._1.distanceFrom(request.floor))
-      .headOption
-      .map(_._2)
+      .collectFirst { case (_, index) => index }
 
   /**
     * Moves elevators Up or Down depending on their stops
     */
   final def step(elevators: Vector[ElevatorState]): Vector[ElevatorState] =
-    elevators.map(e => e.step.getOrElse(e))
+    elevators.map(_.step)
 
 }
