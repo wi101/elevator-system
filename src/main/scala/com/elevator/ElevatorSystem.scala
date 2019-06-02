@@ -35,7 +35,8 @@ final class ElevatorSystem(elevators: Ref[Vector[ElevatorState]],
           case Some(index) =>
             state.updated(index,
                           state(index)
-                            .addStops(request.floor, request.destinationFloor))
+                            .addStop(request.floor)
+                            .addStop(request.destinationFloor))
         }
       }
     } yield ()).repeat(Schedule.forever).unit
@@ -60,7 +61,7 @@ final class ElevatorSystem(elevators: Ref[Vector[ElevatorState]],
 
 object ElevatorSystem {
 
-  val initialElevatorState: ElevatorState = ElevatorState(0, Vector.empty)
+  val initialElevatorState: ElevatorState = ElevatorState(0, Set.empty)
 
   /**
     * initialize all elevators with an initial state

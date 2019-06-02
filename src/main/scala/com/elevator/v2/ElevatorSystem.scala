@@ -33,16 +33,19 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
     STM
       .atomically(for {
         request <- requestQueue.take
-        _ <- elevators.update { state =>
-          ElevatorSystem.search(state, request) match {
-            case None => state
-            case Some(index) =>
-              state.updated(
-                index,
-                state(index)
-                  .addStops(request.floor, request.destinationFloor))
+        s <- elevators
+          .modify { state =>
+            ElevatorSystem.search(state, request) match {
+              case None => STM.retry -> state
+              case Some(index) =>
+                val newState = state.updated(index,
+                                      state(index)
+                                        .addStop(request.floor)
+                                        .addStop(request.destinationFloor))
+                STM.succeed(()) -> newState
+            }
           }
-        }
+          .flatMap(identity)
       } yield ())
       .repeat(Schedule.forever)
       .unit
@@ -75,7 +78,7 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
 
 object ElevatorSystem {
 
-  val initialElevatorState: ElevatorState = ElevatorState(0, Vector.empty)
+  val initialElevatorState: ElevatorState = ElevatorState(0, Set.empty)
 
   /**
     * initialize all elevators with an initial state
