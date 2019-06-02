@@ -16,6 +16,8 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     `run` must run all requests and move the elevators to their next stops                      $e6
     `run` must run all pick-up requests                                                         $e7
     `run` must run all pick-up requests even if the requests are more than the elevator number  $e8
+     the elevator should go up to pickup then go down to delivery $e9
+     the request couldn't be performed will be unfortunaltly ignored (then we need the v2 using STM that will sove that problem :) $e10
     """
 
   def e1 = {
@@ -129,5 +131,29 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
         .repeat(Schedule.doUntil(_ <= 0))
     } yield size must be_<=(0)).supervised
   }
+  def e9 = {
+    val elevators = Vector(ElevatorState(1, Set.empty))
+    val request = PickupRequest(15, 0)
+    (for {
+      system <- ElevatorSystem(elevators)
+      _ <- system.request(request)
+      _ <- system.run(100.millis).fork
+      state <- system.query
+        .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))).delay(100.millis) <* system.requestCount
+        .repeat(Schedule.doUntil(_ <= 0))
+    } yield state must_=== Vector(ElevatorState(0, Set.empty))).supervised
+  }
 
+  def e10 = {
+    val elevators = Vector(ElevatorState(1, Set(10)))
+    val request = PickupRequest(12, 0)
+    (for {
+      system <- ElevatorSystem(elevators)
+      _ <- system.request(request)
+      _ <- system.run(10.millis).fork
+      state <- (system.query
+        .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))) <* system.requestCount
+        .repeat(Schedule.doUntil(_ <= 0))).delay(100.millis)
+    } yield state must_=== Vector(ElevatorState(10, Set.empty))).supervised
+  }
 }
