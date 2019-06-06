@@ -30,10 +30,9 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
     * Handle the requests and add stops to the adequate elevator
     */
   private val processRequests: ZIO[Clock, Nothing, Unit] =
-    STM
-      .atomically(for {
-        request <- requestQueue.take
-        s <- elevators
+    (for {
+        request <- requestQueue.take.commit
+        _ <- elevators
           .modify { state =>
             ElevatorSystem.search(state, request) match {
               case None => STM.retry -> state
@@ -45,10 +44,9 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
                 STM.succeed(()) -> newState
             }
           }
-          .flatMap(identity)
+          .flatMap(identity).commit.fork
       } yield ())
-      .repeat(Schedule.forever)
-      .unit
+      .forever.unit
 
   /**
     * Receives an update about the status of an elevator

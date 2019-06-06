@@ -1,11 +1,10 @@
 package com.elevator
 package v2
 
-import org.specs2.concurrent.ExecutionEnv
 import scalaz.zio.duration._
 import scalaz.zio.{IO, Schedule}
 
-class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
+class ElevatorSystemSpec extends TestRuntime {
   def is = "ElevatorSystemSpec".title ^ s2"""
      make an Elevator System and check if:
     `search` must return the closed elevator to the requested floor                             $e1
@@ -124,8 +123,9 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
       List(PickupRequest(7, 15), PickupRequest(2, 3), PickupRequest(15, 0))
     (for {
       system <- ElevatorSystem(elevators)
-      _ <- IO.forkAll(requests.map(system.request))
+      f <- IO.forkAll(requests.map(system.request))
       _ <- system.run(100.millis).fork
+      _ <- f.join
       size <- system.query
         .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))) *> system.requestCount
         .repeat(Schedule.doUntil(_ <= 0))
@@ -146,15 +146,15 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
   }
 
   def e10 = {
-    val elevators = Vector(ElevatorState(1, Set(10)))
-    val request = PickupRequest(12, 9)
+    val elevators = Vector(ElevatorState(1, Set(10)), ElevatorState(20, Set(30)))
     (for {
       system <- ElevatorSystem(elevators)
-      _ <- system.request(request)
+      _ <- system.request(PickupRequest(12, 9) )
       _ <- system.run(10.millis).fork
+      _ <- system.request(PickupRequest(25, 32)).delay(50.millis)
       state <- (system.query
         .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))) <* system.requestCount
         .repeat(Schedule.doUntil(_ <= 0))).delay(100.millis)
-    } yield state must_=== Vector(ElevatorState(9, Set.empty))).supervised
+    } yield state must_=== Vector(ElevatorState(9, Set.empty), ElevatorState(32, Set.empty))).supervised
   }
 }
