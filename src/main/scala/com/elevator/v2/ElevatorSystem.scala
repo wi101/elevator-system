@@ -4,12 +4,12 @@ package v2
 import scalaz.zio._
 import scalaz.zio.clock.Clock
 import scalaz.zio.duration._
-import scalaz.zio.stm.{STM, TQueue, TRef}
+import scalaz.zio.stm.{STM, TRef}
 
 final case class PickupRequest(floor: Int, destinationFloor: Int)
 
 final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
-                           requestQueue: TQueue[PickupRequest]) {
+                           requestQueue: Queue[PickupRequest]) {
 
   /**
     * Querying the state of the elevator
@@ -31,7 +31,7 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
     */
   private val processRequests: ZIO[Clock, Nothing, Unit] =
     (for {
-        request <- requestQueue.take.commit
+        request <- requestQueue.take
         _ <- elevators
           .modify { state =>
             ElevatorSystem.search(state, request) match {
@@ -44,9 +44,8 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
                 STM.succeed(()) -> newState
             }
           }
-          .flatMap(identity).commit.fork
-      } yield ())
-      .forever.unit
+          .flatMap(identity).commit
+      } yield ()).forever.unit
 
   /**
     * Receives an update about the status of an elevator
@@ -65,13 +64,12 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
     */
   def request(pickupRequest: PickupRequest): UIO[Unit] =
     requestQueue
-      .offer(pickupRequest)
-      .commit
+      .offer(pickupRequest).unit
 
   /**
     * Gets requests count
     */
-  def requestCount: UIO[Int] = requestQueue.size.commit
+  def requestCount: UIO[Int] = requestQueue.size
 }
 
 object ElevatorSystem {
@@ -89,10 +87,10 @@ object ElevatorSystem {
     * Elevator control system should be able to handle multiple elevators up to 16.
     */
   def apply(elevators: Vector[ElevatorState]): UIO[ElevatorSystem] = {
-    (for {
-      requests <- TQueue.make[PickupRequest](elevators.size)
-      state <- TRef.make(elevators)
-    } yield new ElevatorSystem(state, requests)).commit
+    for {
+      requests <- Queue.bounded[PickupRequest](elevators.size)
+      state <- TRef.make(elevators).commit
+    } yield new ElevatorSystem(state, requests)
   }
 
   /**
