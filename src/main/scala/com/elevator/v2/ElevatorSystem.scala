@@ -54,7 +54,7 @@ final class ElevatorSystem(elevators: TRef[Vector[ElevatorState]],
     * 2. take the closest elevator and perform the requests and add the stops to each selected elevator
     */
   def run(durationBetweenFloors: Duration) =
-    moveElevators(durationBetweenFloors).fork *> processRequests
+    moveElevators(durationBetweenFloors).zipPar(processRequests)
 
   /**
     * Receive a pick-up request

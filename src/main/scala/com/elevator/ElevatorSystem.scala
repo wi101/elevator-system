@@ -40,7 +40,7 @@ final class ElevatorSystem(elevators: Ref[Vector[ElevatorState]],
         }
       }
     } yield ()).repeat(Schedule.forever).unit
-    moveElevator.fork *> processRequests
+    moveElevator.zipPar(processRequests).unit
 
   }
 
