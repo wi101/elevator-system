@@ -7,19 +7,19 @@ import org.specs2.specification.core.{AsExecution, Execution}
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import scalaz.zio.{DefaultRuntime, FiberFailure, ZIO}
+import zio.{DefaultRuntime, FiberFailure, ZIO}
 
 abstract class TestRuntime extends Specification with DefaultRuntime {
   val DefaultTimeout: Duration = 60.seconds
   val timer = new Timer()
   implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
-  implicit def zioAsExecution[A: AsResult, R >: Environment, E]
+  implicit def zioAsExecution[A: AsResult, R >: zio.ZEnv, E]
     : AsExecution[ZIO[R, E, A]] =
     io =>
       Execution.withEnvAsync(_ => runToFutureWithTimeout(io, DefaultTimeout))
 
-  protected def runToFutureWithTimeout[E, R >: Environment, A: AsResult](
+  protected def runToFutureWithTimeout[E, R >: zio.ZEnv, A: AsResult](
       io: ZIO[R, E, A],
       timeout: Duration
   ): Future[A] = {
