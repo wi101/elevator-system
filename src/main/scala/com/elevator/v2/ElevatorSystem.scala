@@ -1,10 +1,10 @@
 package com.elevator
 package v2
 
-import scalaz.zio._
-import scalaz.zio.clock.Clock
-import scalaz.zio.duration._
-import scalaz.zio.stm.{STM, TRef}
+import zio._
+import zio.clock.Clock
+import zio.duration._
+import zio.stm.{STM, TRef}
 
 final case class PickupRequest(floor: Int, destinationFloor: Int)
 

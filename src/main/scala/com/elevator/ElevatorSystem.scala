@@ -1,8 +1,8 @@
 package com.elevator
 
-import scalaz.zio.duration._
-import scalaz.zio._
-import scalaz.zio.clock.Clock
+import zio.duration._
+import zio._
+import zio.clock.Clock
 
 final case class PickupRequest(floor: Int, destinationFloor: Int)
 

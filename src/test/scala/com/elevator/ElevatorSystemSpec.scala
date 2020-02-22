@@ -1,9 +1,9 @@
 package com.elevator
 
 import org.specs2.concurrent.ExecutionEnv
-import scalaz.zio.clock.sleep
-import scalaz.zio.duration._
-import scalaz.zio.{IO, Schedule}
+import zio.clock.sleep
+import zio.duration._
+import zio.{IO, Schedule}
 
 class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
   def is = "ElevatorSystemSpec".title ^ s2"""
@@ -97,7 +97,7 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
         .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
       state <- system.query.repeat(Schedule.doUntil(
         _.forall(_.stops.isEmpty))) //the elevators will be all free (without stops)
-    } yield state must_=== finalState).supervised
+    } yield state must_=== finalState)
   }
 
   def e7 = {
@@ -114,7 +114,7 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
         .repeat(Schedule.doUntil(_ <= 0)) //the request will be consumed and we will have a suspended consumer waiting for producers (size will be negative)
       state <- system.query.repeat(Schedule.doUntil(
         _.forall(_.stops.isEmpty))) //the elevators will be all free
-    } yield state must_=== finalState).supervised
+    } yield state must_=== finalState)
   }
 
   def e8 = {
@@ -129,7 +129,7 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
       size <- system.query
         .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))) *> system.requestCount
         .repeat(Schedule.doUntil(_ <= 0))
-    } yield size must be_<=(0)).supervised
+    } yield size must be_<=(0))
   }
   def e9 = {
     val elevators = Vector(ElevatorState(1, Set.empty))
@@ -141,7 +141,7 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
       state <- system.query
         .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))).delay(100.millis) <* system.requestCount
         .repeat(Schedule.doUntil(_ <= 0))
-    } yield state must_=== Vector(ElevatorState(0, Set.empty))).supervised
+    } yield state must_=== Vector(ElevatorState(0, Set.empty)))
   }
 
   def e10 = {
@@ -154,6 +154,6 @@ class ElevatorSystemSpec(implicit ee: ExecutionEnv) extends TestRuntime {
       state <- (system.query
         .repeat(Schedule.doUntil(_.forall(_.stops.isEmpty))) <* system.requestCount
         .repeat(Schedule.doUntil(_ <= 0))).delay(100.millis)
-    } yield state must_=== Vector(ElevatorState(10, Set.empty))).supervised
+    } yield state must_=== Vector(ElevatorState(10, Set.empty)))
   }
 }
