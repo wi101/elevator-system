@@ -4,9 +4,12 @@ version := "0.1"
 
 scalaVersion := "2.12.6"
 
-libraryDependencies ++= Seq("dev.zio" %% "zio" % "1.0.0-RC17") ++ spec
+val ZIOVersion = "1.0.0-RC18-2"
+libraryDependencies ++= Seq("dev.zio" %% "zio" % ZIOVersion) ++ spec
 
 lazy val spec = Seq(
-  "org.specs2" %% "specs2-core" % "4.8.3" % Test,
-  "org.specs2" %% "specs2-matcher-extra" % "4.8.3" % Test
+  "dev.zio" %% "zio-test" % ZIOVersion % Test,
+  "dev.zio" %% "zio-test-sbt" % ZIOVersion % Test
 )
+
+testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
