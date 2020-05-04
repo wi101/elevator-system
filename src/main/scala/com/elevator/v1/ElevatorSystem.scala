@@ -1,8 +1,9 @@
-package com.elevator
+package com.elevator.v1
 
-import zio.duration._
+import com.elevator.ElevatorState
 import zio._
 import zio.clock.Clock
+import zio.duration._
 
 final case class PickupRequest(floor: Int, destinationFloor: Int)
 
@@ -33,10 +34,12 @@ final class ElevatorSystem(elevators: Ref[Vector[ElevatorState]],
         ElevatorSystem.search(state, request) match {
           case None => state
           case Some(index) =>
-            state.updated(index,
-                          state(index)
-                            .addStop(request.floor)
-                            .addStop(request.destinationFloor))
+            state.updated(
+              index,
+              state(index)
+                .addStop(request.floor)
+                .addStop(request.destinationFloor)
+            )
         }
       }
     } yield ()).repeat(Schedule.forever).unit
@@ -50,7 +53,7 @@ final class ElevatorSystem(elevators: Ref[Vector[ElevatorState]],
     * the pickupRequest contains the floor and the direction
     * adds a new request asynchronously (we need to run it concurrently by calling system.request.fork
     */
-  def request(pickupRequest: PickupRequest): UIO[Boolean] =
+  def sendRequest(pickupRequest: PickupRequest): UIO[Boolean] =
     requests.offer(pickupRequest)
 
   /**
